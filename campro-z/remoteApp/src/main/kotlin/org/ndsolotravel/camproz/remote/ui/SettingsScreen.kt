@@ -31,6 +31,8 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val settings by settingsRepo.settings.collectAsState()
+    val caps by clientManager.capabilities.collectAsState()
+    val commandError by clientManager.errorMessage.collectAsState()
     val cameraState by clientManager.cameraState.collectAsState()
     val rttMs by clientManager.rttMs.collectAsState()
     val connectionStatus by clientManager.connectionStatus.collectAsState()
@@ -111,6 +113,8 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
+            commandError?.let { Text(it, color = Color(0xFFFF8A80), modifier = Modifier.padding(8.dp)) }
+            Text("Unavailable host controls are disabled. Format and presets stay on the camera; preview is fixed at 640px / 5 fps.", color = Color.LightGray, fontSize = 12.sp)
             when (activeTab) {
                 0 -> {
                     // TAB 0: Camera Host Recording & Stream Control
@@ -126,7 +130,8 @@ fun SettingsScreen(
                     SettingsSectionCard {
                         SettingsRow(
                             label = "Monitoring Stream Quality",
-                            value = settings.streamQuality,
+                            value = cameraState.previewQuality,
+                            enabled = clientManager.supports(CommandType.SET_STREAM_PROFILE),
                             badge = "CAM HOST",
                             onClick = { dialogOptionSelector = "stream_quality" }
                         )
@@ -135,7 +140,8 @@ fun SettingsScreen(
 
                         SettingsRow(
                             label = "Stream Frame Rate Target",
-                            value = "${settings.streamFps} FPS",
+                            value = "Host controlled",
+                            enabled = clientManager.supports(CommandType.SET_STREAM_PROFILE),
                             badge = "CAM HOST",
                             onClick = { dialogOptionSelector = "stream_fps" }
                         )
@@ -144,6 +150,7 @@ fun SettingsScreen(
 
                         SettingsRow(
                             label = "Active Camera Sensor",
+                            enabled = clientManager.supports(CommandType.SWITCH_CAMERA) && !cameraState.isRecording,
                             value = if (cameraState.activeFacing == "FRONT") "Front Selfie" else "Rear Main Wide",
                             badge = "CAM HOST",
                             onClick = {
@@ -159,6 +166,7 @@ fun SettingsScreen(
 
                         SettingsToggleRow(
                             label = "Camera Flash Torch",
+                            enabled = clientManager.supports(CommandType.SET_TORCH),
                             badge = "CAM HOST",
                             checked = cameraState.isTorchOn,
                             onCheckedChange = { checked ->
@@ -184,6 +192,7 @@ fun SettingsScreen(
                     SettingsSectionCard {
                         SettingsRow(
                             label = "Active 3D LUT Grade",
+                            enabled = clientManager.supports(CommandType.SET_LUT) && !cameraState.isRecording,
                             value = cameraState.activeLutName.replace("_", " ").uppercase(),
                             badge = "CAM HOST",
                             onClick = { dialogOptionSelector = "lut_selector" }
@@ -315,7 +324,7 @@ fun SettingsScreen(
 
                         SettingsInfoRow(
                             label = "Protocol Specification",
-                            value = "CamPro Z v${SecurityHandshake.CURRENT_PROTOCOL_VERSION}"
+                            value = "ProCam Z v${SecurityHandshake.CURRENT_PROTOCOL_VERSION}"
                         )
                     }
 
@@ -338,14 +347,14 @@ fun SettingsScreen(
                         ) {
                             Image(
                                 painter = painterResource(id = R.drawable.app_logo_remote),
-                                contentDescription = "CamPro Z Remote",
+                                contentDescription = "ProCam Z Remote",
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(RoundedCornerShape(10.dp))
                             )
                             Spacer(Modifier.width(14.dp))
                             Column {
-                                Text("CamPro Z Remote", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Text("ProCam Z Remote", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.height(2.dp))
                                 Text("Version 1.0.0 • Studio Companion", color = Color(0xFF90A4AE), fontSize = 12.sp)
                                 Spacer(Modifier.height(2.dp))
@@ -456,15 +465,10 @@ fun SettingsScreen(
         }
 
         "lut_selector" -> {
-            val luts = listOf(
-                "identity" to "Identity (Passthrough)",
-                "natural" to "Natural Rec.709",
-                "travel" to "Travel Vibrant",
-                "warm_sunset" to "Warm Sunset",
-                "cool_cinema" to "Cool Cinema",
-                "mono" to "Monochrome Contrast",
-                "vintage_80s" to "Vintage 80s"
-            )
+            val lutList = caps?.optJSONArray("luts")
+            val luts = if (lutList == null) emptyList() else (0 until lutList.length()).map {
+                val lut = lutList.getJSONObject(it); lut.getString("id") to lut.getString("name")
+            }
             AlertDialog(
                 onDismissRequest = { dialogOptionSelector = null },
                 containerColor = Color(0xFF161A20),
@@ -481,7 +485,7 @@ fun SettingsScreen(
                                     .clickable {
                                         clientManager.sendCommand(
                                             CommandType.SET_LUT,
-                                            "{\"lutId\":\"$id\",\"intensity\":1.0}"
+                                            org.json.JSONObject().put("lutId", id).put("intensity", 1.0).toString()
                                         )
                                         dialogOptionSelector = null
                                     }
@@ -525,17 +529,18 @@ private fun SettingsRow(
     label: String,
     value: String,
     badge: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    enabled: Boolean = true
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp)
-            .clickable(onClick = onClick),
+            .heightIn(min = 52.dp)
+            .clickable(enabled = enabled, onClick = onClick),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(label, color = Color.White, fontSize = 14.sp)
             Spacer(Modifier.width(8.dp))
             BadgeLabel(badge)
@@ -554,7 +559,8 @@ private fun SettingsToggleRow(
     label: String,
     badge: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true
 ) {
     Row(
         modifier = Modifier
@@ -563,7 +569,7 @@ private fun SettingsToggleRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(label, color = Color.White, fontSize = 14.sp)
             Spacer(Modifier.width(8.dp))
             BadgeLabel(badge)
@@ -572,6 +578,7 @@ private fun SettingsToggleRow(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = Color(0xFF00E5FF),

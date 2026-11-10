@@ -1,7 +1,9 @@
 package org.ndsolotravel.camproz.protocol
 
+import org.json.JSONObject
+
 /**
- * Robust JSON serialization and deserialization for CamPro Z remote protocol.
+ * Robust JSON serialization and deserialization for ProCam Z remote protocol.
  * Formatted with strict type-safety, versioning, and defensive error handling.
  */
 object ProtocolCodec {
@@ -21,13 +23,14 @@ object ProtocolCodec {
 
     fun decodeCommand(json: String): CommandMessage? {
         return try {
-            val version = extractString(json, "version") ?: "1.0"
-            val sessionId = extractString(json, "sessionId") ?: ""
-            val commandId = extractString(json, "commandId") ?: ""
+            val version = extractString(json, "version") ?: return null
+            if (version != "1.0") return null
+            val sessionId = extractString(json, "sessionId")?.takeIf { it.isNotBlank() } ?: return null
+            val commandId = extractString(json, "commandId")?.takeIf { it.isNotBlank() } ?: return null
             val typeStr = extractString(json, "type") ?: return null
             val type = CommandType.valueOf(typeStr)
             val timestamp = extractLong(json, "timestamp") ?: 0L
-            val payload = extractJsonObject(json, "payload") ?: "{}"
+            val payload = extractJsonObject(json, "payload") ?: return null
             CommandMessage(
                 protocolVersion = version,
                 sessionId = sessionId,
@@ -175,54 +178,15 @@ object ProtocolCodec {
         }
     }
 
-    // Helper utilities for pure lightweight JSON parsing
-    private fun escape(s: String): String = s.replace("\\", "\\\\").replace("\"", "\\\"")
 
-    fun extractString(json: String, key: String): String? {
-        val pattern = "\"$key\"\\s*:\\s*\"([^\"]*)\"".toRegex()
-        return pattern.find(json)?.groupValues?.get(1)
+    private fun escape(s: String): String = JSONObject.quote(s).removeSurrounding("\"")
+    private fun value(json: String, key: String): Any? = try { JSONObject(json).opt(key) } catch (_: Exception) { null }
+    fun extractString(json: String, key: String): String? = value(json, key) as? String
+    fun extractLong(json: String, key: String): Long? = (value(json, key) as? Number)?.let {
+        val n = it.toLong(); if (it.toDouble() == n.toDouble()) n else null
     }
-
-    fun extractLong(json: String, key: String): Long? {
-        val pattern = "\"$key\"\\s*:\\s*(-?\\d+)".toRegex()
-        return pattern.find(json)?.groupValues?.get(1)?.toLongOrNull()
-    }
-
-    fun extractInt(json: String, key: String): Int? {
-        val pattern = "\"$key\"\\s*:\\s*(-?\\d+)".toRegex()
-        return pattern.find(json)?.groupValues?.get(1)?.toIntOrNull()
-    }
-
-    fun extractFloat(json: String, key: String): Float? {
-        val pattern = "\"$key\"\\s*:\\s*(-?\\d+(?:\\.\\d+)?)".toRegex()
-        return pattern.find(json)?.groupValues?.get(1)?.toFloatOrNull()
-    }
-
-    fun extractBoolean(json: String, key: String): Boolean? {
-        val pattern = "\"$key\"\\s*:\\s*(true|false)".toRegex()
-        return pattern.find(json)?.groupValues?.get(1)?.toBooleanStrictOrNull()
-    }
-
-    fun extractJsonObject(json: String, key: String): String? {
-        val marker = "\"$key\""
-        val idx = json.indexOf(marker)
-        if (idx == -1) return null
-        val colonIdx = json.indexOf(':', idx + marker.length)
-        if (colonIdx == -1) return null
-        var start = colonIdx + 1
-        while (start < json.length && json[start].isWhitespace()) start++
-        if (start >= json.length || json[start] != '{') return null
-
-        var depth = 0
-        for (i in start until json.length) {
-            if (json[i] == '{') depth++
-            else if (json[i] == '}') {
-                depth--
-                if (depth == 0) {
-                    return json.substring(start, i + 1)
-                }
-            }
-        }
-        return null
-    }
+    fun extractInt(json: String, key: String): Int? = extractLong(json, key)?.takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt()
+    fun extractFloat(json: String, key: String): Float? = (value(json, key) as? Number)?.toFloat()?.takeIf { it.isFinite() }
+    fun extractBoolean(json: String, key: String): Boolean? = value(json, key) as? Boolean
+    fun extractJsonObject(json: String, key: String): String? = (value(json, key) as? JSONObject)?.toString()
 }

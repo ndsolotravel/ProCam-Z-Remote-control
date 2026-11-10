@@ -39,6 +39,11 @@ class RemoteMainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStop() {
+        clientManager.disconnect()
+        super.onStop()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         clientManager.release()

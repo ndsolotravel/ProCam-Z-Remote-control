@@ -137,7 +137,7 @@ fun CamProZCameraScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Image(
                     painter = painterResource(id = R.drawable.app_logo_camproz),
-                    contentDescription = "CamPro Z Logo",
+                    contentDescription = "ProCam Z Logo",
                     modifier = Modifier
                         .size(38.dp)
                         .clip(RoundedCornerShape(8.dp))
@@ -145,7 +145,7 @@ fun CamProZCameraScreen(
                 Spacer(Modifier.width(10.dp))
                 Column {
                     Text(
-                        text = "CamPro Z",
+                        text = "ProCam Z",
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
@@ -309,13 +309,13 @@ fun CamProZCameraScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Image(
                             painter = painterResource(id = R.drawable.app_logo_camproz),
-                            contentDescription = "CamPro Z Logo",
+                            contentDescription = "ProCam Z Logo",
                             modifier = Modifier
                                 .size(28.dp)
                                 .clip(RoundedCornerShape(6.dp))
                         )
                         Spacer(Modifier.width(10.dp))
-                        Text("Pair CamPro Z Remote", fontWeight = FontWeight.Bold)
+                        Text("Pair ProCam Z Remote", fontWeight = FontWeight.Bold)
                     }
                 },
                 text = {
@@ -337,7 +337,7 @@ fun CamProZCameraScreen(
                             }
                         }
 
-                        Text("Scan this QR code from CamPro Z Remote:", fontSize = 13.sp)
+                        Text("Scan this QR code from ProCam Z Remote:", fontSize = 13.sp)
                         Spacer(Modifier.height(10.dp))
                         currentPairing?.let { p ->
                             // High-contrast QR Container with dedicated white quiet zone

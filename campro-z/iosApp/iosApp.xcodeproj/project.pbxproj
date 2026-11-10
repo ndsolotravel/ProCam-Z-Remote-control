@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		869CDBE54C540E95ACB120BA /* CamPro Z.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "CamPro Z.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		869CDBE54C540E95ACB120BA /* ProCam Z.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ProCam Z.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -59,7 +59,7 @@
 		9F8A80FC40E29CF450A3EC77 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				869CDBE54C540E95ACB120BA /* CamPro Z.app */,
+				869CDBE54C540E95ACB120BA /* ProCam Z.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -87,7 +87,7 @@
 			packageProductDependencies = (
 			);
 			productName = iosApp;
-			productReference = 869CDBE54C540E95ACB120BA /* CamPro Z.app */;
+			productReference = 869CDBE54C540E95ACB120BA /* ProCam Z.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */

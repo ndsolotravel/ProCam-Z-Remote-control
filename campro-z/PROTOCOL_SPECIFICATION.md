@@ -1,19 +1,19 @@
-# CamPro Z Remote Control Protocol Specification
+# ProCam Z Remote Control Protocol Specification
 **Document Version:** 1.0.0  
-**Target Applications:** CamPro Z (`org.ndsolotravel.apps`) & CamPro Z Remote (`org.ndsolotravel.camproz.remote`)  
+**Target Applications:** ProCam Z (`org.ndsolotravel.apps`) & ProCam Z Remote (`org.ndsolotravel.camproz.remote`)  
 **Network Scope:** Local Offline WiFi & Mobile Hotspot (Zero Cloud / Zero Internet Dependencies)
 
 ---
 
 ## 1. Architectural Overview
 
-CamPro Z Remote enables zero-latency, secure monitoring and camera parameter manipulation across two Android devices communicating exclusively over local networking (Wi-Fi LAN or cellular hotspot).
+ProCam Z Remote enables zero-latency, secure monitoring and camera parameter manipulation across two Android devices communicating exclusively over local networking (Wi-Fi LAN or cellular hotspot).
 
 The architecture cleanly divides communication into two isolated, high-performance transports:
 
 ```
 +-------------------------------------------------------------------+
-|                        CamPro Z Host                              |
+|                        ProCam Z Host                              |
 |                                                                   |
 |  [ Camera2 Engine ]  <--->  [ OpenGL ES 3.0 Renderer (3D LUTs) ]  |
 |          |                                 |                      |
@@ -33,7 +33,7 @@ The architecture cleanly divides communication into two isolated, high-performan
 |  [ Normalized Touch Transform ]                                   |
 |  [ Compose Dark Studio UI ]                                       |
 |                                                                   |
-|                      CamPro Z Remote Companion                    |
+|                      ProCam Z Remote Companion                    |
 +-------------------------------------------------------------------+
 ```
 
@@ -68,7 +68,7 @@ When pairing mode is opened on the host camera screen:
 
 ### 2.3 Authentication Handshake Sequence
 ```
-Remote Companion                       CamPro Z Camera Host
+Remote Companion                       ProCam Z Camera Host
        |                                         |
        |----- (1) Connect WS (ws://host:8989) -->|
        |                                         |

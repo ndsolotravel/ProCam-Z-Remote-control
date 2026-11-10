@@ -1,0 +1,135 @@
+    // LAN commands share the existing Camera2 manager and recording mutex with local controls.
+    val lanRemote by lazy { com.rearviewpro.camera.remote.LanRemoteHost(context, this) }
+    var lanRevision = 0L
+        private set
+
+    fun lanCapabilities(): org.json.JSONObject {
+        val m = manualControlsState.value
+        val cap = capabilities.value[currentLens.value]
+        val commands = mutableListOf("START_RECORDING", "STOP_RECORDING", "SET_ZOOM", "SET_EXPOSURE_COMPENSATION", "REQUEST_SNAPSHOT", "DISCONNECT")
+        if (cap?.supportsTouchAf == true) commands += "SET_FOCUS_POINT"
+        if (cap?.supportsTouchAe == true) commands += "SET_EXPOSURE_POINT"
+        if (m.isManualFocusSupported) commands += listOf("SET_MANUAL_FOCUS", "LOCK_FOCUS")
+        if (m.isAeLockSupported) commands += "LOCK_EXPOSURE"
+        if (m.isManualSensorSupported) commands += "SET_MANUAL_EXPOSURE"
+        if (cap != null && cap.supportedAwbModes.isNotEmpty()) commands += "SET_WHITE_BALANCE_MODE"
+        if (capabilities.value.size > 1) commands += "SWITCH_CAMERA"
+        commands += "SET_LUT"
+        return org.json.JSONObject().put("commands", org.json.JSONArray(commands))
+            .put("minZoom", m.supportedZoomRange.start).put("maxZoom", m.supportedZoomRange.endInclusive)
+            .put("minExposureComp", m.supportedEvRange.start).put("maxExposureComp", m.supportedEvRange.endInclusive)
+            .put("exposureCompStep", m.evStep).put("minIso", m.supportedIsoRange.start).put("maxIso", m.supportedIsoRange.endInclusive)
+            .put("minExposureTimeNs", m.supportedExposureRangeNs.start).put("maxExposureTimeNs", m.supportedExposureRangeNs.endInclusive)
+            .put("maxFocusDiopters", m.supportedFocusDistanceRange.endInclusive)
+            .put("luts", org.json.JSONArray().apply {
+                put(org.json.JSONObject().put("id", "none").put("name", "None"))
+                lutState.value.entries.forEach { put(org.json.JSONObject().put("id", it.id).put("name", it.name)) }
+            }).put("unsupportedReason", "Unavailable controls are not exposed by this camera's LAN adapter. Format and presets remain local; preview is a 640px JPEG monitor at up to 5 fps.")
+    }
+
+    fun lanSnapshot(): org.json.JSONObject {
+        val m = manualControlsState.value
+        val recording = recordingState.value as? RecordingState.Recording
+        return org.json.JSONObject().put("revision", ++lanRevision).put("activeFacing", currentLens.value.name)
+            .put("isRecording", recording != null).put("recDuration", recording?.elapsedSeconds ?: 0)
+            .put("zoom", m.zoomRatio).put("focusLocked", m.isAfLocked).put("focusDist", m.manualFocusDistance)
+            .put("expLocked", m.isAeLocked).put("expComp", m.evIndex).put("iso", m.effectiveIso)
+            .put("expTime", m.effectiveExposureTimeNs).put("wb", m.wbPreset.name)
+            .put("lut", lutState.value.selectedId ?: "none").put("lutIntensity", lutState.value.strength)
+            .put("battery", batteryPercentage.value).put("storageMb", storageAvailableMb.value)
+            .put("thermal", thermalStatus.value).put("previewQuality", "640px / 5 fps")
+            .put("cameraReady", recordingState.value is RecordingState.Previewing || recording != null)
+            .put("cameraError", (recordingState.value as? RecordingState.Error)?.message ?: "")
+    }
+
+    suspend fun executeLanCommand(type: String, payload: org.json.JSONObject) {
+        require(lanCapabilities().getJSONArray("commands").let { a -> (0 until a.length()).any { a.getString(it) == type } }) {
+            "Unsupported control: $type. ${lanCapabilities().getString("unsupportedReason")}"
+        }
+        if (type == "REQUEST_SNAPSHOT") return
+        require(recordingState.value is RecordingState.Previewing || recordingState.value is RecordingState.Recording) { "Camera is unavailable or busy. Keep the camera app in the foreground with permissions granted." }
+        fun number(key: String, range: ClosedFloatingPointRange<Float>): Float {
+            val value = payload.getDouble(key).toFloat()
+            require(value.isFinite() && value in range) { "$key is outside device limits: $range" }; return value
+        }
+        when (type) {
+            "START_RECORDING", "STOP_RECORDING" -> actionMutex.withLock {
+                val start = type == "START_RECORDING"
+                require(!countdownState.value.isActive) { "A local countdown is active." }
+                if (start && _recordingState.value !is RecordingState.Recording) startRecordingInternal()
+                if (!start && _recordingState.value is RecordingState.Recording) stopRecordingInternal()
+                require(if (start) _recordingState.value is RecordingState.Recording else _recordingState.value is RecordingState.Previewing) {
+                    (_recordingState.value as? RecordingState.Error)?.message ?: fallbackNotice.value ?: "Recording transition failed"
+                }
+            }
+            "SWITCH_CAMERA" -> {
+                require(!isCaptureLocked()) { "Stop recording before switching cameras." }
+                val facing = CameraLens.valueOf(payload.getString("facing"))
+                require(capabilities.value.containsKey(facing)) { "Camera facing unavailable" }
+                if (currentLens.value != facing) {
+                    switchCamera()
+                    // startPreview queues under the same action mutex.
+                    kotlinx.coroutines.yield()
+                    actionMutex.withLock { require(recordingState.value is RecordingState.Previewing) { "Camera switch failed" } }
+                }
+            }
+            "SET_ZOOM" -> {
+                val zoom = number("zoom", manualControlsState.value.supportedZoomRange)
+                cancelAutoZoom("Remote zoom")
+                cameraManager.applyZoomRatioLive(zoom).getOrThrow()
+                _manualControlsState.update { it.copy(zoomRatio = zoom) }
+            }
+            "SET_FOCUS_POINT", "SET_EXPOSURE_POINT" -> {
+                val x = number("x", 0f..1f) * _viewWidth.value
+                val y = number("y", 0f..1f) * _viewHeight.value
+                require(_viewWidth.value > 0 && _viewHeight.value > 0) { "Preview geometry not ready" }
+                if (type == "SET_FOCUS_POINT") {
+                    stopSubjectTracking()
+                    cameraManager.triggerTapToFocusAt(x, y, _viewWidth.value, _viewHeight.value, false).getOrThrow()
+                    _manualControlsState.update { it.copy(focusMeteringPoint = x to y, isAfLocked = false, focusMode = FocusMode.AUTO) }
+                } else {
+                    cameraManager.triggerTapToExposeAt(x, y, _viewWidth.value, _viewHeight.value).getOrThrow()
+                    _manualControlsState.update { it.copy(exposureMeteringPoint = x to y) }
+                }
+            }
+            "SET_LUT" -> {
+                require(!isCaptureLocked() && !lutState.value.busy) { "Stop recording and wait for LUT loading before changing LUT." }
+                val id = payload.getString("lutId").takeUnless { it == "none" }
+                require(id == null || lutState.value.entries.any { it.id == id }) { "LUT unavailable on host" }
+                val intensity = number("intensity", 0f..1f)
+                selectLut(id)
+                while (lutState.value.busy) kotlinx.coroutines.delay(20)
+                require(lutState.value.selectedId == id && lutState.value.message == null) { lutState.value.message ?: "LUT failed to load" }
+                setLutStrength(intensity)
+            }
+            else -> {
+                val m = manualControlsState.value
+                val updated = when (type) {
+                    "LOCK_EXPOSURE" -> m.copy(isAeLocked = payload.getBoolean("locked"))
+                    "LOCK_FOCUS" -> {
+                        stopSubjectTracking()
+                        val locked = payload.getBoolean("locked")
+                        m.copy(isAfLocked = locked, focusMode = if (locked) FocusMode.LOCKED else FocusMode.AUTO)
+                    }
+                    "SET_MANUAL_FOCUS" -> m.copy(manualFocusDistance = number("distance", m.supportedFocusDistanceRange), focusMode = FocusMode.MANUAL, isAfLocked = false)
+                    "SET_EXPOSURE_COMPENSATION" -> {
+                        val index = payload.getInt("index"); require(index in m.supportedEvRange) { "EV index outside device range" }
+                        m.copy(evIndex = index, evValue = index * m.evStep, exposureMode = ExposureMode.AUTO)
+                    }
+                    "SET_MANUAL_EXPOSURE" -> {
+                        val iso = payload.getInt("iso"); val ns = payload.getLong("exposureTimeNs")
+                        require(iso in m.supportedIsoRange && ns in m.supportedExposureRangeNs) { "ISO or shutter outside device range" }
+                        m.copy(selectedIso = iso, selectedExposureTimeNs = ns, exposureMode = ExposureMode.MANUAL)
+                    }
+                    "SET_WHITE_BALANCE_MODE" -> {
+                        val preset = WhiteBalancePreset.valueOf(payload.getString("mode"))
+                        require(preset != WhiteBalancePreset.LOCKED) { "Use local white balance lock." }
+                        m.copy(wbPreset = preset, isAwbLocked = false)
+                    }
+                    else -> error("Unsupported control: $type")
+                }
+                cameraManager.updateManualSettings(updated).getOrThrow()
+                _manualControlsState.value = updated
+            }
+        }
+    }

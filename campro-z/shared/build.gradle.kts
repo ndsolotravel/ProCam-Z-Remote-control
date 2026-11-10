@@ -54,6 +54,10 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.kotlinx.coroutines.core)
         }
+        getByName("androidHostTest").dependencies {
+            implementation("org.json:json:20240303")
+            implementation(libs.kotlin.testJunit)
+        }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }

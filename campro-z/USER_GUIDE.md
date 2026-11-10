@@ -1,6 +1,6 @@
-# CamPro Z & CamPro Z Remote - User & Operator Guide
+# ProCam Z & ProCam Z Remote - User & Operator Guide
 
-Welcome to **CamPro Z** and **CamPro Z Remote**, a professional Android dual-device remote camera monitoring and control system. This system allows one Android phone to act as the master recording camera (mounted on a tripod, gimbal, crane, or rig) while a second Android phone or tablet functions as a wireless wireless field monitor and control console.
+Welcome to **ProCam Z** and **ProCam Z Remote**, a professional Android dual-device remote camera monitoring and control system. This system allows one Android phone to act as the master recording camera (mounted on a tripod, gimbal, crane, or rig) while a second Android phone or tablet functions as a wireless wireless field monitor and control console.
 
 ---
 
@@ -10,17 +10,17 @@ Both applications are completely standalone and have distinct package namespaces
 
 | Application | Role | Application ID | APK File Location |
 | :--- | :--- | :--- | :--- |
-| **CamPro Z** | Camera Host & Master Recorder | `org.ndsolotravel.apps` | `campro-z/androidApp/build/outputs/apk/debug/androidApp-debug.apk` |
-| **CamPro Z Remote** | Wireless Field Monitor & Controller | `org.ndsolotravel.camproz.remote` | `campro-z/remoteApp/build/outputs/apk/debug/remoteApp-debug.apk` |
+| **ProCam Z** | Camera Host & Master Recorder | `org.ndsolotravel.apps` | `campro-z/androidApp/build/outputs/apk/debug/androidApp-debug.apk` |
+| **ProCam Z Remote** | Wireless Field Monitor & Controller | `org.ndsolotravel.camproz.remote` | `campro-z/remoteApp/build/outputs/apk/debug/remoteApp-debug.apk` |
 
 ### Installing via ADB (Command Line)
 If you have devices connected via USB or wireless ADB:
 
 ```powershell
-# 1. Install CamPro Z on your recording phone:
+# 1. Install ProCam Z on your recording phone:
 adb -s <CAMERA_DEVICE_SERIAL> install -r "campro-z\androidApp\build\outputs\apk\debug\androidApp-debug.apk"
 
-# 2. Install CamPro Z Remote on your monitoring phone/tablet:
+# 2. Install ProCam Z Remote on your monitoring phone/tablet:
 adb -s <REMOTE_DEVICE_SERIAL> install -r "campro-z\remoteApp\build\outputs\apk\debug\remoteApp-debug.apk"
 ```
 
@@ -28,7 +28,7 @@ adb -s <REMOTE_DEVICE_SERIAL> install -r "campro-z\remoteApp\build\outputs\apk\d
 
 ## 2. Network Configuration
 
-CamPro Z requires **zero internet access**, **zero cloud logins**, and **zero external servers**. It operates entirely within your local local-area network (LAN).
+ProCam Z requires **zero internet access**, **zero cloud logins**, and **zero external servers**. It operates entirely within your local local-area network (LAN).
 
 ### Option A: Mobile Phone Hotspot (Recommended for Field / Outdoor Shooting)
 1. On either phone (e.g., your camera phone), turn on **Personal Hotspot / Portable Wi-Fi Hotspot**.
@@ -44,8 +44,8 @@ CamPro Z requires **zero internet access**, **zero cloud logins**, and **zero ex
 
 ## 3. Step-by-Step Pairing Guide
 
-### Step 1: Launch CamPro Z on the Camera Phone
-1. Open the **CamPro Z** app.
+### Step 1: Launch ProCam Z on the Camera Phone
+1. Open the **ProCam Z** app.
 2. Grant camera and microphone permissions when prompted.
 3. Tap the **Pairing / Wireless** icon (broadcast icon) in the top-right toolbar.
 4. A pairing modal will appear displaying:
@@ -54,8 +54,8 @@ CamPro Z requires **zero internet access**, **zero cloud logins**, and **zero ex
    * Command & Stream Ports (`8989` & `8990`).
    * A 6-digit **PAIRING PIN** (e.g., `839120`).
 
-### Step 2: Connect from CamPro Z Remote
-1. Open **CamPro Z Remote** on your monitoring phone or tablet.
+### Step 2: Connect from ProCam Z Remote
+1. Open **ProCam Z Remote** on your monitoring phone or tablet.
 2. In the connection hub:
    * **Automatic Discovery:** Available cameras on the network will appear automatically under *Discovered Cameras*. Tap your camera name (e.g., `CamProZ-92A1`).
    * **Manual Connect:** If multicast is restricted on your network, tap **Manual Connect**, enter the Host IP (e.g. `192.168.43.1`) and the 6-digit PIN code from the camera screen, then tap **Connect**.

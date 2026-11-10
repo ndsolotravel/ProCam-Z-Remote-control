@@ -1,0 +1,65 @@
+[
+  {
+    "check": "Unauthenticated preview rejected",
+    "status": "passed"
+  },
+  {
+    "check": "Wrong PIN rejected",
+    "status": "passed"
+  },
+  {
+    "check": "Real camera approval and protocol snapshot",
+    "status": "passed",
+    "commands": [
+      "START_RECORDING",
+      "STOP_RECORDING",
+      "SET_ZOOM",
+      "SET_EXPOSURE_COMPENSATION",
+      "REQUEST_SNAPSHOT",
+      "DISCONNECT",
+      "SET_FOCUS_POINT",
+      "SET_EXPOSURE_POINT",
+      "SET_MANUAL_FOCUS",
+      "LOCK_FOCUS",
+      "LOCK_EXPOSURE",
+      "SET_MANUAL_EXPOSURE",
+      "SET_WHITE_BALANCE_MODE",
+      "SWITCH_CAMERA",
+      "SET_LUT"
+    ],
+    "facing": "BACK"
+  },
+  {
+    "check": "Authenticated camera JPEG preview",
+    "status": "passed",
+    "frameBytes": [
+      22642,
+      22688,
+      22675
+    ]
+  },
+  {
+    "check": "Real camera zoom accepted",
+    "status": "passed"
+  },
+  {
+    "check": "Out-of-range zoom rejected",
+    "status": "passed"
+  },
+  {
+    "check": "Unsupported command rejected",
+    "status": "passed"
+  },
+  {
+    "check": "Duplicate record command preserves recording",
+    "status": "passed"
+  },
+  {
+    "check": "Remote recording finalized on real camera",
+    "status": "passed"
+  },
+  {
+    "check": "Repeated stop is idempotent",
+    "status": "passed"
+  }
+]

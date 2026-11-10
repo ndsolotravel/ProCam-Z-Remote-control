@@ -15,7 +15,7 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 
 /**
- * Host server running on the CamPro Z camera device.
+ * Host server running on the ProCam Z camera device.
  * Exposes NSD discovery, WebSocket command channel with authentication,
  * and low-latency monitoring frame streaming.
  */
@@ -76,7 +76,7 @@ class CamProZHostServer(
             }
         }
 
-        Log.i("HostServer", "CamPro Z Host Server running. PIN=${currentPairingInfo?.pinCode}, Token=${currentPairingInfo?.sessionToken}, CmdPort=$commandPort, StreamPort=$streamPort")
+        Log.i("HostServer", "ProCam Z Host Server running. PIN=${currentPairingInfo?.pinCode}, Token=${currentPairingInfo?.sessionToken}, CmdPort=$commandPort, StreamPort=$streamPort")
     }
 
     fun isHostNetworkReady(): Boolean = getLocalIpAddress() != null

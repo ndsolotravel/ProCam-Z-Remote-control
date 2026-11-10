@@ -120,8 +120,11 @@ private fun Camera2QrScanner(
                     private var backgroundThread: HandlerThread? = null
                     private var backgroundHandler: Handler? = null
                     private var imageReader: android.media.ImageReader? = null
+                    private val disposed = AtomicBoolean(false)
+                    private var ownedPreviewSurface: Surface? = null
 
                     override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
+                        disposed.set(false)
                         backgroundThread = HandlerThread("ScannerBackground").apply { start() }
                         backgroundHandler = Handler(backgroundThread!!.looper)
 
@@ -151,8 +154,13 @@ private fun Camera2QrScanner(
                                 try {
                                     val planes = image.planes
                                     val yBuffer = planes[0].buffer
-                                    val yBytes = ByteArray(yBuffer.remaining())
-                                    yBuffer.get(yBytes)
+                                    val yBytes = ByteArray(image.width * image.height)
+                                    val rowStride = planes[0].rowStride
+                                    val pixelStride = planes[0].pixelStride
+                                    val base = yBuffer.position()
+                                    for (y in 0 until image.height) for (x in 0 until image.width) {
+                                        yBytes[y * image.width + x] = yBuffer.get(base + y * rowStride + x * pixelStride)
+                                    }
 
                                     val source = PlanarYUVLuminanceSource(
                                         yBytes, image.width, image.height,
@@ -171,7 +179,7 @@ private fun Camera2QrScanner(
                                         val payload = result.text
                                         when (val validation = SecurityHandshake.PairingInfo.validateQrPayload(payload)) {
                                             is SecurityHandshake.QrValidationResult.Success -> {
-                                                onScanSuccess(validation.info)
+                                                android.os.Handler(android.os.Looper.getMainLooper()).post { if (!disposed.get()) onScanSuccess(validation.info) }
                                             }
                                             is SecurityHandshake.QrValidationResult.Expired -> {
                                                 hasScanned.set(false) // allow rescan after error
@@ -199,11 +207,13 @@ private fun Camera2QrScanner(
 
                         st.setDefaultBufferSize(scanWidth, scanHeight)
                         val previewSurface = Surface(st)
+                        ownedPreviewSurface = previewSurface
                         val readerSurface = imageReader!!.surface
 
                         try {
                             manager.openCamera(cameraId, object : CameraDevice.StateCallback() {
                                 override fun onOpened(camera: CameraDevice) {
+                                    if (disposed.get()) { camera.close(); return }
                                     cameraDevice = camera
                                     try {
                                         val builder = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
@@ -216,6 +226,7 @@ private fun Camera2QrScanner(
                                             listOf(previewSurface, readerSurface),
                                             object : CameraCaptureSession.StateCallback() {
                                                 override fun onConfigured(session: CameraCaptureSession) {
+                                                    if (disposed.get()) { session.close(); return }
                                                     captureSession = session
                                                     try {
                                                         session.setRepeatingRequest(builder.build(), null, backgroundHandler)
@@ -249,10 +260,12 @@ private fun Camera2QrScanner(
                     }
 
                     override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                        disposed.set(true)
                         try {
                             captureSession?.close()
                             cameraDevice?.close()
                             imageReader?.close()
+                            ownedPreviewSurface?.release(); ownedPreviewSurface = null
                             backgroundThread?.quitSafely()
                         } catch (_: Exception) {}
                         return true
@@ -329,7 +342,7 @@ private fun ScannerHudOverlay(onClose: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "Scan CamPro Z QR Code",
+                "Scan ProCam Z QR Code",
                 color = Color.White,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold
@@ -358,7 +371,7 @@ private fun ScannerHudOverlay(onClose: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "Point camera at the QR code displayed on the CamPro Z camera screen",
+                    "Point camera at the QR code displayed on the ProCam Z camera screen",
                     color = Color.White,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center
@@ -403,7 +416,7 @@ private fun PermissionExplanationView(
             if (isPermanentlyDenied)
                 "Camera access was denied. Please open system settings and allow camera access to scan the pairing QR code."
             else
-                "CamPro Z Remote needs camera permission to scan the host QR code and establish a zero-trust connection.",
+                "ProCam Z Remote needs camera permission to scan the host QR code and establish a zero-trust connection.",
             color = Color(0xFFB0BEC5),
             fontSize = 14.sp,
             textAlign = TextAlign.Center

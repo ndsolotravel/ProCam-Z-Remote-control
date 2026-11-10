@@ -19,7 +19,7 @@ import java.io.File
 import kotlin.math.roundToInt
 
 /**
- * Single authoritative Camera2 engine for CamPro Z.
+ * Single authoritative Camera2 engine for ProCam Z.
  * Serializes camera commands, manages preview and recording pipelines,
  * and publishes synchronized state snapshots to local UI and remote companion.
  */
