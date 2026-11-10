@@ -1,0 +1,70 @@
+import { projectCliAnalysisResult } from "./projectCliAnalysisResult.js";
+import { z } from "incur";
+import { createWebSourceLocationService } from "../composition/webSourceLocations.js";
+import { webSourceLocationInputSchema } from "../domain/webSourceLocation.js";
+import { CLI_COMMANDS } from "../cliCommandNames.js";
+import { logCliCommand } from "../cliLogging.js";
+import type { Logger } from "pino";
+import type { CliInstance } from "./types.js";
+import { cliDecimalField, cliIntegerArgument } from "./options.js";
+import { withCommandCancellation } from "./commandCancellation.js";
+import { finishAnalysisCommand } from "./finishAnalysisCommand.js";
+
+const sourceMapSelection = webSourceLocationInputSchema.shape.source_map;
+
+/** Expose the same explicit selected map/point contract through the CLI. */
+export const registerWebSourceLocationCommands = (
+  cli: CliInstance,
+  logger: Logger,
+  environment: Readonly<NodeJS.ProcessEnv>,
+): void => {
+  const service = createWebSourceLocationService(environment);
+  cli.command(CLI_COMMANDS.traceWebSourceLocation, {
+    description:
+      "Trace one retained script position through an explicitly selected local source map",
+    args: z.object({
+      manifestPath: webSourceLocationInputSchema.shape.manifest_path,
+      scriptIndex: cliIntegerArgument(0).describe(
+        "Zero-based manifest script index",
+      ),
+      sourceMapPath: sourceMapSelection.shape.path,
+      sourceMapUrl: sourceMapSelection.shape.url,
+      line: cliIntegerArgument(1).describe("One-based generated line"),
+      column: cliIntegerArgument(0).describe(
+        "Zero-based UTF-16 generated column",
+      ),
+    }),
+    options: z.object({
+      decodeTimeoutMs: cliDecimalField(
+        webSourceLocationInputSchema.shape.decode_timeout_ms,
+      ),
+    }),
+    run: ({ args, options }) =>
+      withCommandCancellation((signal) =>
+        logCliCommand(logger, CLI_COMMANDS.traceWebSourceLocation, () =>
+          finishAnalysisCommand(
+            () =>
+              service.trace(
+                {
+                  manifest_path: args.manifestPath,
+                  script_index: args.scriptIndex,
+                  source_map: {
+                    path: args.sourceMapPath,
+                    url: args.sourceMapUrl,
+                  },
+                  generated_position: { line: args.line, column: args.column },
+                  ...(options.decodeTimeoutMs === undefined
+                    ? {}
+                    : { decode_timeout_ms: options.decodeTimeoutMs }),
+                },
+                { signal },
+              ),
+            service,
+            "web-source-location",
+            "trace_web_source_location",
+            signal,
+          ).then(projectCliAnalysisResult),
+        ),
+      ),
+  });
+};
